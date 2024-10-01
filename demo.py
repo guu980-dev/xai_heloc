@@ -9,7 +9,9 @@ from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
 import torch
 import re
 import inspect
-
+import matplotlib.pyplot as plt
+import os
+import time
 
 # Pre-load models globally
 bst = None
@@ -201,16 +203,27 @@ def analysis(
       # 확률 값으로 반환하여 LIME에서 사용 가능하게 함
       probas = bst.predict(dmatrix_data)  # 확률 값 반환
       return np.column_stack([1 - probas, probas])  # LIME은 클래스별 확률을 받으므로 [1-p, p] 형식으로 반환
+
   lime_exp = lime_explainer.explain_instance(user_data.iloc[0].values, predict_fn_for_lime, num_features=10)
-  # lime_exp = lime_explainer.explain_instance(user_data.iloc[0].values, 
-  #                                             lambda x: np.column_stack([1 - bst.predict(xgb.DMatrix(x)), bst.predict(xgb.DMatrix(x))]), 
-  #                                             num_features=10)
   lime_importance = pd.DataFrame(lime_exp.as_list(), columns=['Feature', 'LIME Importance'])
   lime_importance_string = importance_to_str(lime_importance, "LIME")
+
+  # Generate LIME plot
+  now = time.time()
+  os.makedirs(f"images/{now}", exist_ok=True)
+  lime_plot = lime_exp.as_pyplot_figure()  # Get the LIME plot as a figure
+  lime_plot.savefig(f"images/{now}/lime_plot.png", bbox_inches="tight")  # Save plot to file
+  plt.close(lime_plot)
 
   shap_importance = pd.DataFrame({'Feature': user_data.columns, 'SHAP Importance': np.abs(shap_values[0])})
   shap_importance = shap_importance.sort_values(by='SHAP Importance', ascending=False).head(10)
   shap_importance_string = importance_to_str(shap_importance, "SHAP")
+
+  # Generate SHAP plot
+  plt.figure()
+  shap.summary_plot(shap_values, user_data, show=False)  # Generate SHAP summary plot
+  plt.savefig(f"images/{now}/shap_summary_plot.png", bbox_inches="tight")  # Save plot to file
+  plt.close()
 
   # Generate prompt for Gemma analysis
   good_proba = 1 - prediction_proba
@@ -220,49 +233,59 @@ def analysis(
   # Use Gemma for final analysis
   conclusion = gemma_analysis(prompt)
   
-  return conclusion
+  return conclusion, f"images/{now}/shap_summary_plot.png", f"images/{now}/lime_plot.png"
 
 
 load_models()
 
+# Use Gradio Blocks for advanced layout
+with gr.Blocks() as demo:
+  gr.Markdown("# HELOC Credit Risk Prediction")
+  gr.Markdown("Enter the required details to predict credit risk using XGBoost and receive an analysis from the Gemma model.")
+  
+  inputs = []
+  with gr.Row():
+    inputs.append(gr.Number(label="ExternalRiskEstimate", info="외부 신용점수 추정치"))
+    inputs.append(gr.Number(label="MSinceOldestTradeOpen", info="가장 오래된 거래가 열린 이후 경과한 개월 수"))
+    inputs.append(gr.Number(label="MSinceMostRecentTradeOpen", info="최근 거래가 열린 이후 경과한 개월 수"))
+    inputs.append(gr.Number(label="AverageMInFile", info="신용 기록 파일 내 평균 월수"))
+  with gr.Row():
+    inputs.append(gr.Number(label="NumSatisfactoryTrades", info="만족스러운 거래 수"))
+    inputs.append(gr.Number(label="NumTrades60Ever2DerogPubRec", info="60일 이상 연체 또는 부정적 공공 기록이 있는 거래 수"))
+    inputs.append(gr.Number(label="NumTrades90Ever2DerogPubRec", info="90일 이상 연체된 거래 수"))
+    inputs.append(gr.Number(label="PercentTradesNeverDelq", info="연체되지 않은 거래의 비율"))
+  with gr.Row():
+    inputs.append(gr.Number(label="MSinceMostRecentDelq", info="최근 연체 이후 경과한 개월 수"))
+    inputs.append(gr.Number(label="MaxDelq2PublicRecLast12M", info="지난 12개월 동안의 공공 기록에서 가장 큰 연체 기록"))
+    inputs.append(gr.Number(label="MaxDelqEver", info="최대 연체 기록"))
+    inputs.append(gr.Number(label="NumTotalTrades", info="전체 거래 수"))
+  with gr.Row():
+    inputs.append(gr.Number(label="NumTradesOpeninLast12M", info="최근 12개월 동안 개설된 거래 수"))
+    inputs.append(gr.Number(label="PercentInstallTrades", info="할부 거래 비율"))
+    inputs.append(gr.Number(label="MSinceMostRecentInqexcl7days", info="최근 7일 제외, 신용 조회 이후 경과한 개월 수"))
+    inputs.append(gr.Number(label="NumInqLast6M", info="지난 6개월 동안 신용 조회 수"))
+  with gr.Row():
+    inputs.append(gr.Number(label="NumInqLast6Mexcl7days", info="지난 6개월 동안 신용 조회 수, 최근 7일 제외"))
+    inputs.append(gr.Number(label="NetFractionRevolvingBurden", info="순회전 부채 부담 비율"))
+    inputs.append(gr.Number(label="NetFractionInstallBurden", info="할부 부채 부담 비율"))
+    inputs.append(gr.Number(label="NumRevolvingTradesWBalance", info="잔액이 있는 회전 신용 거래 수"))
+  with gr.Row():
+    inputs.append(gr.Number(label="NumInstallTradesWBalance", info="잔액이 있는 할부 신용 거래 수"))
+    inputs.append(gr.Number(label="NumBank2NatlTradesWHighUtilization", info="높은 사용 비율을 보이는 거래 수"))
+    inputs.append(gr.Number(label="PercentTradesWBalance", info="잔액이 있는 거래 비율"))
 
-# Define Gradio inputs and outputs
-inputs = [
-    gr.Number(label="ExternalRiskEstimate (외부 신용점수 추정치)"),
-    gr.Number(label="MSinceOldestTradeOpen (가장 오래된 거래가 열린 이후 경과한 개월 수)"),
-    gr.Number(label="MSinceMostRecentTradeOpen (최근 거래가 열린 이후 경과한 개월 수)"),
-    gr.Number(label="AverageMInFile (신용 기록 파일 내 평균 월수)"),
-    gr.Number(label="NumSatisfactoryTrades (만족스러운 거래 수)"),
-    gr.Number(label="NumTrades60Ever2DerogPubRec (60일 이상 연체 또는 부정적 공공 기록이 있는 거래 수)"),
-    gr.Number(label="NumTrades90Ever2DerogPubRec (90일 이상 연체된 거래 수)"),
-    gr.Number(label="PercentTradesNeverDelq (연체되지 않은 거래의 비율)"),
-    gr.Number(label="MSinceMostRecentDelq (최근 연체 이후 경과한 개월 수)"),
-    gr.Number(label="MaxDelq2PublicRecLast12M (지난 12개월 동안의 공공 기록에서 가장 큰 연체 기록)"),
-    gr.Number(label="MaxDelqEver (최대 연체 기록)"),
-    gr.Number(label="NumTotalTrades (전체 거래 수)"),
-    gr.Number(label="NumTradesOpeninLast12M (최근 12개월 동안 개설된 거래 수)"),
-    gr.Number(label="PercentInstallTrades (할부 거래 비율)"),
-    gr.Number(label="MSinceMostRecentInqexcl7days (최근 7일 제외, 신용 조회 이후 경과한 개월 수)"),
-    gr.Number(label="NumInqLast6M (지난 6개월 동안 신용 조회 수)"),
-    gr.Number(label="NumInqLast6Mexcl7days (지난 6개월 동안 신용 조회 수, 최근 7일 제외)"),
-    gr.Number(label="NetFractionRevolvingBurden (순회전 부채 부담 비율)"),
-    gr.Number(label="NetFractionInstallBurden (할부 부채 부담 비율)"),
-    gr.Number(label="NumRevolvingTradesWBalance (잔액이 있는 회전 신용 거래 수)"),
-    gr.Number(label="NumInstallTradesWBalance (잔액이 있는 할부 신용 거래 수)"),
-    gr.Number(label="NumBank2NatlTradesWHighUtilization (높은 사용 비율을 보이는 거래 수)"),
-    gr.Number(label="PercentTradesWBalance (잔액이 있는 거래 비율)")
-]
+  submit_btn = gr.Button("Submit")
+  output_text = gr.Textbox(label="Gemma Analysis Conclusion")
+  with gr.Row():
+    shap_image = gr.Image(label="SHAP Summary Plot")  # For SHAP plot
+    lime_image = gr.Image(label="LIME Explanation Plot")  # For LIME plot
 
-output = gr.Textbox(label="Gemma Analysis Conclusion")
+  submit_btn.click(
+    fn=analysis, 
+    inputs=inputs, 
+    outputs=[output_text, shap_image, lime_image],
+  )
 
-# Create Gradio Interface
-iface = gr.Interface(
-  fn=analysis,
-  inputs=inputs,
-  outputs=output,
-  title="HELOC Credit Risk Prediction",
-  description="Enter the required details to predict credit risk using XGBoost and receive an analysis from the Gemma model."
-)
 
 # Launch the Gradio app
-iface.launch(share=True)
+demo.launch(share=True)
