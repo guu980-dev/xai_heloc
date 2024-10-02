@@ -240,8 +240,8 @@ load_models()
 
 # Use Gradio Blocks for advanced layout
 with gr.Blocks() as demo:
-  gr.Markdown("# HELOC Credit Risk Prediction")
-  gr.Markdown("Enter the required details to predict credit risk using XGBoost and receive an analysis from the Gemma model.")
+  gr.Markdown("# MMExplainer: Credit Risk Prediction")
+  gr.Markdown("MMExplainer analyzes ML model results using HELOC data with XAI methods like LIME and SHAP, providing clear, Gemma-based insights. It enhances transparency and trust in predictions, helping users make informed decisions in finance and credit risk management.")
   
   inputs = []
   with gr.Row():
