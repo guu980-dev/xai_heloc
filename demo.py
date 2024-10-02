@@ -12,15 +12,34 @@ import inspect
 import matplotlib.pyplot as plt
 import os
 import time
+import base64
+from huggingface_hub import login
 
 # Pre-load models globally
 bst = None
 gemma_tokenizer = None
 gemma_model = None
+counter = 0
+
+def show_choice(choice):
+    if choice == "Explain Factor":
+          counㅣter = 0
+    elif choice == "Explain shortly":
+          counter = 1
+    elif choice == "Explain in detail":
+          counter = 2
+    return f"You selected: {choice}"
+
+def get_base64_image(image_path):
+  with open(image_path, "rb") as img_file:
+    return base64.b64encode(img_file.read()).decode('utf-8')
 
 
 def load_models():
   global bst, gemma_tokenizer, gemma_model
+  
+  token = input("Enter your Huggingface token for Gemma2 9b:")
+  login(token)
   
   # Load the XGBoost model
   bst = xgb.Booster()
@@ -47,7 +66,7 @@ def proba_to_class(proba):
   return "Good" if proba < 0.5 else "Bad"
 
 
-def format_prompt(predict_proba_good, predict_proba_bad, predicted_class, shap_analysis, lime_analysis):
+def format_prompt0(predict_proba_good, predict_proba_bad, predicted_class, shap_analysis, lime_analysis):
   prompt = inspect.cleandoc('''
     Question:
     The following is the result of binary classification using the HELOC (Home Equity Line of Credit) Dataset and XGBClassifier to classify RiskPerformance into “Good” and “Bad.”
@@ -91,6 +110,83 @@ def format_prompt(predict_proba_good, predict_proba_bad, predicted_class, shap_a
     lime_analysis=lime_analysis
   )
 
+def format_prompt1(predict_proba_good, predict_proba_bad, predicted_class, shap_analysis, lime_analysis):
+  prompt = inspect.cleandoc('''
+    Question:
+    The following is the result of binary classification using the HELOC (Home Equity Line of Credit) Dataset and XGBClassifier to classify RiskPerformance into “Good” and “Bad.”
+    The value “Bad” indicates that a consumer was 90 days past due or worse at least once over a period of 24 months from when the credit account was opened. The value “Good” indicates that they have made their payments without ever being more than 90 days overdue.
+
+    Before answering, please think steyp by step coincisely in these steps to explain the prediction.
+    1. SHAP Analysis: Analyze the key features from the SHAP analysis, explaining how each feature contributes to the prediction.
+    This step should be inside <SHAP>$$INSERT TEXT HERE$$</SHAP> tag.
+    2. LIME Analysis: Analyze the key features from the LIME analysis, explaining the contribution of each feature in terms of how it influences the prediction.
+    This step should be inside <LIME>$$INSERT TEXT HERE$$</LIME> tag.
+    3. Insight Synthesis: Based on the individual feature analyses from SHAP and LIME, synthesize the insights to provide a comprehensive conclusion. The conclusion should focus on how these features work together to influence the final prediction.
+    This step should be inside <Insight>$$INSERT TEXT HERE$$</Insight> tag.
+    4. Final Explanation for Non-Experts: Provide the prediction result and explain the comprehensive reasoning behind the result, considering multiple factors that contributed to this outcome. Ensure the explanation is clear, detailed, and avoids using technical terms or direct references to probabilities or numbers, so that the final explanation is understandable to non-experts in machine learning or finance.
+    This step should be inside <Conclusion>$$INSERT TEXT HERE$$</Conclusion> tag.
+
+    Context:
+    1. Prediction Probability
+    - Good: {predict_proba_good}
+    - Bad: {predict_proba_bad}
+    - Predicted to {predicted_class}
+
+    2. SHAP analysis (Feature, SHAP Importance)
+    {shap_analysis}
+
+    3. LIME analysis (Feature, LIME Importance)
+    {lime_analysis}
+
+    Answer:
+  ''')
+  
+  return prompt.format(
+    predict_proba_good=predict_proba_good,
+    predict_proba_bad=predict_proba_bad,
+    predicted_class=predicted_class,
+    shap_analysis=shap_analysis,
+    lime_analysis=lime_analysis
+  )
+
+def format_prompt0(predict_proba_good, predict_proba_bad, predicted_class, shap_analysis, lime_analysis):
+  prompt = inspect.cleandoc('''
+    Question:
+    The following is the result of binary classification using the HELOC (Home Equity Line of Credit) Dataset and XGBClassifier to classify RiskPerformance into “Good” and “Bad.”
+    The value “Bad” indicates that a consumer was 90 days past due or worse at least once over a period of 24 months from when the credit account was opened. The value “Good” indicates that they have made their payments without ever being more than 90 days overdue.
+
+    Please follow these steps to explain the prediction:
+
+    1. Analyze the key features from the SHAP analysis, explaining how each feature contributes to the prediction.
+    2. Analyze the key features from the LIME analysis, explaining the contribution of each feature in terms of how it influences the prediction.
+    3. Based on the individual feature analyses from SHAP and LIME, synthesize the insights to provide a comprehensive conclusion. The conclusion should focus on how these features work together to influence the final prediction.
+    4. Instead of focusing on technical jargon, ensure that the final explanation is understandable to non-experts in machine learning or finance.
+
+    Context:
+    1. Prediction Probability
+    - Good: {predict_proba_good}
+    - Bad: {predic_proba_bad}
+    - Predicted to {predicted_class}
+
+    2. SHAP analysis (Feature, SHAP Importance)
+    {shap_analysis}
+
+    3. LIME analysis (Feature, LIME Importance)
+    {lime_analysis}
+
+    Answer:
+    1. SHAP Analysis: First, explain each feature's SHAP importance and how it contributes to the final prediction.
+    2. LIME Analysis: Then, explain the individual feature importance from LIME and its role in the prediction.
+    3. Conclusion: Finally, synthesize the insights from both SHAP and LIME to provide a comprehensive, easy-to-understand conclusion.
+  ''')
+  
+  return prompt.format(
+    predict_proba_good=predict_proba_good,
+    predict_proba_bad=predict_proba_bad,
+    predicted_class=predicted_class,
+    shap_analysis=shap_analysis,
+    lime_analysis=lime_analysis
+  )
 
 def generate_gemma_response(prompt, tokenizer, model, device):
   inputs = tokenizer(prompt, return_tensors="pt").to(device)
@@ -228,7 +324,12 @@ def analysis(
   # Generate prompt for Gemma analysis
   good_proba = 1 - prediction_proba
   bad_proba = prediction_proba
-  prompt = format_prompt(good_proba, bad_proba, prediction_class, shap_importance_string, lime_importance_string)
+  if counter == 0:
+    prompt = format_prompt0(good_proba, bad_proba, prediction_class, shap_importance_string, lime_importance_string)
+  if counter == 1:
+    prompt = format_prompt1(good_proba, bad_proba, prediction_class, shap_importance_string, lime_importance_string)
+  if counter == 2:
+    prompt = format_prompt2(good_proba, bad_proba, prediction_class, shap_importance_string, lime_importance_string)
   
   # Use Gemma for final analysis
   conclusion = gemma_analysis(prompt)
@@ -237,11 +338,18 @@ def analysis(
 
 
 load_models()
+image_base64 = get_base64_image("asset/logo.png")
 
 # Use Gradio Blocks for advanced layout
 with gr.Blocks() as demo:
-  gr.Markdown("# HELOC Credit Risk Prediction")
-  gr.Markdown("Enter the required details to predict credit risk using XGBoost and receive an analysis from the Gemma model.")
+  with gr.Row():
+    gr.HTML(f"""
+      <div style="display: flex; align-items: center; justify-content: flex-start;">
+        <img src="data:image/png;base64,{image_base64}" alt="Logo" style="width: 80px; height: auto; margin-right: 10px;">
+        <h1 style="margin: 0; padding: 0;">MMExplainer: Credit Risk Prediction</h1>
+      </div>
+    """)  # Align logo and title on the same row, with left justification
+  gr.Markdown("MMExplainer analyzes ML model results using HELOC data with XAI methods like LIME and SHAP, providing clear, Gemma-based insights. It enhances transparency and trust in predictions, helping users make informed decisions in finance and credit risk management.")
   
   inputs = []
   with gr.Row():
@@ -274,7 +382,9 @@ with gr.Blocks() as demo:
     inputs.append(gr.Number(label="NumBank2NatlTradesWHighUtilization", info="높은 사용 비율을 보이는 거래 수"))
     inputs.append(gr.Number(label="PercentTradesWBalance", info="잔액이 있는 거래 비율"))
 
-  submit_btn = gr.Button("Submit")
+  with gr.Row():
+    radio = gr.Radio(["Explain Factor", "Explain shortly", "Explain in detail"], label="Choose an option")
+    submit_btn = gr.Button("Submit")
   output_text = gr.Textbox(label="Gemma Analysis Conclusion")
   with gr.Row():
     shap_image = gr.Image(label="SHAP Summary Plot")  # For SHAP plot
