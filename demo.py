@@ -12,11 +12,17 @@ import inspect
 import matplotlib.pyplot as plt
 import os
 import time
+import base64
 
 # Pre-load models globally
 bst = None
 gemma_tokenizer = None
 gemma_model = None
+
+
+def get_base64_image(image_path):
+  with open(image_path, "rb") as img_file:
+    return base64.b64encode(img_file.read()).decode('utf-8')
 
 
 def load_models():
@@ -237,10 +243,17 @@ def analysis(
 
 
 load_models()
+image_base64 = get_base64_image("asset/logo.png")
 
 # Use Gradio Blocks for advanced layout
 with gr.Blocks() as demo:
-  gr.Markdown("# MMExplainer: Credit Risk Prediction")
+  with gr.Row():
+    gr.HTML(f"""
+      <div style="display: flex; align-items: center; justify-content: flex-start;">
+        <img src="data:image/png;base64,{image_base64}" alt="Logo" style="width: 80px; height: auto; margin-right: 10px;">
+        <h1 style="margin: 0; padding: 0;">MMExplainer: Credit Risk Prediction</h1>
+      </div>
+    """)  # Align logo and title on the same row, with left justification
   gr.Markdown("MMExplainer analyzes ML model results using HELOC data with XAI methods like LIME and SHAP, providing clear, Gemma-based insights. It enhances transparency and trust in predictions, helping users make informed decisions in finance and credit risk management.")
   
   inputs = []

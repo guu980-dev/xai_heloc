@@ -6,3 +6,4 @@ result
 model
 .env
 images
+__pycache__
