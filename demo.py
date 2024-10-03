@@ -149,7 +149,7 @@ def format_prompt1(predict_proba_good, predict_proba_bad, predicted_class, shap_
     lime_analysis=lime_analysis
   )
 
-def format_prompt0(predict_proba_good, predict_proba_bad, predicted_class, shap_analysis, lime_analysis):
+def format_prompt2(predict_proba_good, predict_proba_bad, predicted_class, shap_analysis, lime_analysis):
   prompt = inspect.cleandoc('''
     Question:
     The following is the result of binary classification using the HELOC (Home Equity Line of Credit) Dataset and XGBClassifier to classify RiskPerformance into “Good” and “Bad.”
