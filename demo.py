@@ -43,8 +43,7 @@ def get_base64_image(image_path):
 
 def load_models():
   global bst, gemma_tokenizer, gemma_model
-  
-  # token = input("Enter your Huggingface token for Gemma2 9b:")
+
   load_dotenv()
   login(os.getenv("HUGGINGFACE_TOKEN"))
   
