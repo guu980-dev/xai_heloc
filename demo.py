@@ -66,11 +66,11 @@ def proba_to_class(proba):
 
 def format_prompt(predict_proba_good, predict_proba_bad, predicted_class, shap_analysis, lime_analysis, prompt_type):
   if prompt_type == "Friendly Tone":
-    prompt_templtae = friendly_tone_template
+    prompt_template = friendly_tone_template
   elif prompt_type == "Formal Tone":
-    prompt_templtae = formal_tone_template
+    prompt_template = formal_tone_template
     
-  prompt_template = inspect.cleandoc(prompt_templtae)
+  prompt_template = inspect.cleandoc(prompt_template)
   return prompt_template.format(
     predict_proba_good=predict_proba_good,
     predict_proba_bad=predict_proba_bad,
@@ -179,11 +179,12 @@ def analysis(
   shap_values = explainer.shap_values(user_data)
 
   lime_explainer = lime.lime_tabular.LimeTabularExplainer(
-      user_data.values,
-      feature_names=list(user_data.columns),
-      class_names=['Good', 'Bad'],
-      discretize_continuous=True
+    user_data.values,
+    feature_names=list(user_data.columns),
+    class_names=['Good', 'Bad'],
+    discretize_continuous=False
   )
+
   # XGBoost의 예측을 확률로 반환하도록 하는 래핑된 함수
   def predict_fn_for_lime(input_data):
       dmatrix_data = xgb.DMatrix(input_data, feature_names=list(user_data.columns))
@@ -270,7 +271,7 @@ with gr.Blocks() as demo:
     inputs.append(gr.Number(label="PercentTradesWBalance", info="잔액이 있는 거래 비율"))
 
   with gr.Row():
-    radio = gr.Radio(["Friendly Tone", "Formal Tone"], label="Choose Prompt Option")
+    radio = gr.Radio(["Friendly Tone", "Formal Tone"], value="Friendly Tone", label="Choose Prompt Option")
     inputs.append(radio)
     submit_btn = gr.Button("Submit")
   output_text = gr.Textbox(label="Gemma Analysis Conclusion")
