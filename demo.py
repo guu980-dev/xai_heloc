@@ -15,21 +15,13 @@ import time
 import base64
 from huggingface_hub import login
 from dotenv import load_dotenv
+from prompt import friendly_tone_template, formal_tone_template, analytic_tone_template
 
 # Pre-load models globally
 bst = None
 gemma_tokenizer = None
 gemma_model = None
-counter = 0
 
-def show_choice(choice):
-    if choice == "Explain Factor":
-          counㅣter = 0
-    elif choice == "Explain shortly":
-          counter = 1
-    elif choice == "Explain in detail":
-          counter = 2
-    return f"You selected: {choice}"
 
 def get_base64_image(image_path):
   with open(image_path, "rb") as img_file:
@@ -72,43 +64,16 @@ def proba_to_class(proba):
   return "Good" if proba < 0.5 else "Bad"
 
 
-def format_prompt0(predict_proba_good, predict_proba_bad, predicted_class, shap_analysis, lime_analysis):
-  prompt = inspect.cleandoc('''
-    Question:
-    The following is the result of binary classification using the HELOC (Home Equity Line of Credit) Dataset and XGBClassifier to classify RiskPerformance into “Good” and “Bad.”
-    The value “Bad” indicates that a consumer was 90 days past due or worse at least once over a period of 24 months from when the credit account was opened. The value “Good” indicates that they have made their payments without ever being more than 90 days overdue.
-
-    Before answering, please think steyp by step coincisely in these steps to explain the prediction.
-    1. SHAP Analysis: Analyze the key features from the SHAP analysis, explaining how each feature contributes to the prediction.
-    This step should be inside <SHAP>$$INSERT TEXT HERE$$</SHAP> tag.
-    2. LIME Analysis: Analyze the key features from the LIME analysis, explaining the contribution of each feature in terms of how it influences the prediction.
-    This step should be inside <LIME>$$INSERT TEXT HERE$$</LIME> tag.
-    3. Insight Synthesis: Based on the individual feature analyses from SHAP and LIME, synthesize the insights to provide a comprehensive conclusion. The conclusion should focus on how these features work together to influence the final prediction.
-    This step should be inside <Insight>$$INSERT TEXT HERE$$</Insight> tag.
-    4. Final Explanation for Non-Experts: Provide the prediction result and explain the comprehensive reasoning behind the result, considering multiple factors that contributed to this outcome. Ensure the explanation is clear, detailed, and avoids using technical terms or direct references to probabilities or numbers, so that the final explanation is understandable to non-experts in machine learning or finance.
-    This step should be inside <Conclusion>$$INSERT TEXT HERE$$</Conclusion> tag.
-    In this part,
-    - Ensure to be thorough and specific as possible, with enough length to fully explain the reasoning behind the prediction and offer clear, actionable advice to the user.
-    - Please respond as if you were a human, using natural conversational tone. Be engaging, empathetic, and use phrases and expressions that sound like they’re coming from a real person, keeping the tone friendly and conversational. Avoid sounding overly formal or robotic.
-    - Please provide a sentences without explicitly using terms like 'model,' 'probability,' or directly mentioning numbers. Instead, explain the concepts in simple, intuitive language that avoids technical jargon.
-    - At the end of the part, provide a personalized piece of advice for the user on how they can improve or maintain their risk performance in the future.
-
-    Context:
-    1. Prediction Probability
-    - Good: {predict_proba_good}
-    - Bad: {predict_proba_bad}
-    - Predicted to {predicted_class}
-
-    2. SHAP analysis (Feature, SHAP Importance)
-    {shap_analysis}
-
-    3. LIME analysis (Feature, LIME Importance)
-    {lime_analysis}
-
-    Answer:
-  ''')
-  
-  return prompt.format(
+def format_prompt(predict_proba_good, predict_proba_bad, predicted_class, shap_analysis, lime_analysis, prompt_type):
+  if prompt_type == "Friendly Tone":
+    prompt_templtae = friendly_tone_template
+  elif prompt_type == "Formal Tone":
+    prompt_templtae = formal_tone_template
+  elif prompt_type == "Analytic Tone":
+    prompt_templtae - analytic_tone_template
+    
+  prompt_template = inspect.cleandoc(prompt_templtae)
+  return prompt_template.format(
     predict_proba_good=predict_proba_good,
     predict_proba_bad=predict_proba_bad,
     predicted_class=predicted_class,
@@ -116,83 +81,6 @@ def format_prompt0(predict_proba_good, predict_proba_bad, predicted_class, shap_
     lime_analysis=lime_analysis
   )
 
-def format_prompt1(predict_proba_good, predict_proba_bad, predicted_class, shap_analysis, lime_analysis):
-  prompt = inspect.cleandoc('''
-    Question:
-    The following is the result of binary classification using the HELOC (Home Equity Line of Credit) Dataset and XGBClassifier to classify RiskPerformance into “Good” and “Bad.”
-    The value “Bad” indicates that a consumer was 90 days past due or worse at least once over a period of 24 months from when the credit account was opened. The value “Good” indicates that they have made their payments without ever being more than 90 days overdue.
-
-    Before answering, please think steyp by step coincisely in these steps to explain the prediction.
-    1. SHAP Analysis: Analyze the key features from the SHAP analysis, explaining how each feature contributes to the prediction.
-    This step should be inside <SHAP>$$INSERT TEXT HERE$$</SHAP> tag.
-    2. LIME Analysis: Analyze the key features from the LIME analysis, explaining the contribution of each feature in terms of how it influences the prediction.
-    This step should be inside <LIME>$$INSERT TEXT HERE$$</LIME> tag.
-    3. Insight Synthesis: Based on the individual feature analyses from SHAP and LIME, synthesize the insights to provide a comprehensive conclusion. The conclusion should focus on how these features work together to influence the final prediction.
-    This step should be inside <Insight>$$INSERT TEXT HERE$$</Insight> tag.
-    4. Final Explanation for Non-Experts: Provide the prediction result and explain the comprehensive reasoning behind the result, considering multiple factors that contributed to this outcome. Ensure the explanation is clear, detailed, and avoids using technical terms or direct references to probabilities or numbers, so that the final explanation is understandable to non-experts in machine learning or finance.
-    This step should be inside <Conclusion>$$INSERT TEXT HERE$$</Conclusion> tag.
-
-    Context:
-    1. Prediction Probability
-    - Good: {predict_proba_good}
-    - Bad: {predict_proba_bad}
-    - Predicted to {predicted_class}
-
-    2. SHAP analysis (Feature, SHAP Importance)
-    {shap_analysis}
-
-    3. LIME analysis (Feature, LIME Importance)
-    {lime_analysis}
-
-    Answer:
-  ''')
-  
-  return prompt.format(
-    predict_proba_good=predict_proba_good,
-    predict_proba_bad=predict_proba_bad,
-    predicted_class=predicted_class,
-    shap_analysis=shap_analysis,
-    lime_analysis=lime_analysis
-  )
-
-def format_prompt2(predict_proba_good, predict_proba_bad, predicted_class, shap_analysis, lime_analysis):
-  prompt = inspect.cleandoc('''
-    Question:
-    The following is the result of binary classification using the HELOC (Home Equity Line of Credit) Dataset and XGBClassifier to classify RiskPerformance into “Good” and “Bad.”
-    The value “Bad” indicates that a consumer was 90 days past due or worse at least once over a period of 24 months from when the credit account was opened. The value “Good” indicates that they have made their payments without ever being more than 90 days overdue.
-
-    Please follow these steps to explain the prediction:
-
-    1. Analyze the key features from the SHAP analysis, explaining how each feature contributes to the prediction.
-    2. Analyze the key features from the LIME analysis, explaining the contribution of each feature in terms of how it influences the prediction.
-    3. Based on the individual feature analyses from SHAP and LIME, synthesize the insights to provide a comprehensive conclusion. The conclusion should focus on how these features work together to influence the final prediction.
-    4. Instead of focusing on technical jargon, ensure that the final explanation is understandable to non-experts in machine learning or finance.
-
-    Context:
-    1. Prediction Probability
-    - Good: {predict_proba_good}
-    - Bad: {predic_proba_bad}
-    - Predicted to {predicted_class}
-
-    2. SHAP analysis (Feature, SHAP Importance)
-    {shap_analysis}
-
-    3. LIME analysis (Feature, LIME Importance)
-    {lime_analysis}
-
-    Answer:
-    1. SHAP Analysis: First, explain each feature's SHAP importance and how it contributes to the final prediction.
-    2. LIME Analysis: Then, explain the individual feature importance from LIME and its role in the prediction.
-    3. Conclusion: Finally, synthesize the insights from both SHAP and LIME to provide a comprehensive, easy-to-understand conclusion.
-  ''')
-  
-  return prompt.format(
-    predict_proba_good=predict_proba_good,
-    predict_proba_bad=predict_proba_bad,
-    predicted_class=predicted_class,
-    shap_analysis=shap_analysis,
-    lime_analysis=lime_analysis
-  )
 
 def generate_gemma_response(prompt, tokenizer, model, device):
   inputs = tokenizer(prompt, return_tensors="pt").to(device)
@@ -263,7 +151,8 @@ def analysis(
     PercentInstallTrades, MSinceMostRecentInqexcl7days, NumInqLast6M, 
     NumInqLast6Mexcl7days, NetFractionRevolvingBurden, NetFractionInstallBurden, 
     NumRevolvingTradesWBalance, NumInstallTradesWBalance, 
-    NumBank2NatlTradesWHighUtilization, PercentTradesWBalance
+    NumBank2NatlTradesWHighUtilization, PercentTradesWBalance,
+    prompt_type
 ):
   global bst, gemma_tokenizer, gemma_model
 
@@ -330,13 +219,9 @@ def analysis(
   # Generate prompt for Gemma analysis
   good_proba = 1 - prediction_proba
   bad_proba = prediction_proba
-  if counter == 0:
-    prompt = format_prompt0(good_proba, bad_proba, prediction_class, shap_importance_string, lime_importance_string)
-  if counter == 1:
-    prompt = format_prompt1(good_proba, bad_proba, prediction_class, shap_importance_string, lime_importance_string)
-  if counter == 2:
-    prompt = format_prompt2(good_proba, bad_proba, prediction_class, shap_importance_string, lime_importance_string)
   
+  prompt = format_prompt(good_proba, bad_proba, prediction_class, shap_importance_string, lime_importance_string, prompt_type)
+
   # Use Gemma for final analysis
   conclusion = gemma_analysis(prompt)
   
@@ -389,7 +274,8 @@ with gr.Blocks() as demo:
     inputs.append(gr.Number(label="PercentTradesWBalance", info="잔액이 있는 거래 비율"))
 
   with gr.Row():
-    radio = gr.Radio(["Explain Factor", "Explain shortly", "Explain in detail"], label="Choose an option")
+    radio = gr.Radio(["Friendly Tone", "Formal Tone", "Analytic Tone"], label="Choose Prompt Option")
+    inputs.append(radio)
     submit_btn = gr.Button("Submit")
   output_text = gr.Textbox(label="Gemma Analysis Conclusion")
   with gr.Row():
