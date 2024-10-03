@@ -80,7 +80,7 @@ analytic_tone_template = '''
   Context:
   1. Prediction Probability
   - Good: {predict_proba_good}
-  - Bad: {predic_proba_bad}
+  - Bad: {predict_proba_bad}
   - Predicted to {predicted_class}
 
   2. SHAP analysis (Feature, SHAP Importance)

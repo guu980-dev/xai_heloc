@@ -15,7 +15,7 @@ import time
 import base64
 from huggingface_hub import login
 from dotenv import load_dotenv
-from prompt import friendly_tone_template, formal_tone_template, analytic_tone_template
+from prompt import friendly_tone_template, formal_tone_template
 
 # Pre-load models globally
 bst = None
@@ -69,8 +69,6 @@ def format_prompt(predict_proba_good, predict_proba_bad, predicted_class, shap_a
     prompt_templtae = friendly_tone_template
   elif prompt_type == "Formal Tone":
     prompt_templtae = formal_tone_template
-  elif prompt_type == "Analytic Tone":
-    prompt_templtae - analytic_tone_template
     
   prompt_template = inspect.cleandoc(prompt_templtae)
   return prompt_template.format(
@@ -89,12 +87,10 @@ def generate_gemma_response(prompt, tokenizer, model, device):
   return response
 
 
+# User Only Prompt 2.x versions
 def extract_conclusion_part(gemma_response):
-  if "Conclusion:" in gemma_response:
-    return gemma_response.split("Conclusion:")[1].strip()
-  else:
-    conclusions = re.findall(r'<Conclusion>(.*?)</Conclusion>', gemma_response, re.DOTALL)
-    return conclusions[-1].strip()
+  conclusions = re.findall(r'<Conclusion>(.*?)</Conclusion>', gemma_response, re.DOTALL)
+  return conclusions[-1].strip()
 
 
 def gemma_analysis(prompt):
@@ -274,7 +270,7 @@ with gr.Blocks() as demo:
     inputs.append(gr.Number(label="PercentTradesWBalance", info="잔액이 있는 거래 비율"))
 
   with gr.Row():
-    radio = gr.Radio(["Friendly Tone", "Formal Tone", "Analytic Tone"], label="Choose Prompt Option")
+    radio = gr.Radio(["Friendly Tone", "Formal Tone"], label="Choose Prompt Option")
     inputs.append(radio)
     submit_btn = gr.Button("Submit")
   output_text = gr.Textbox(label="Gemma Analysis Conclusion")
