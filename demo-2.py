@@ -14,7 +14,6 @@ import os
 import time
 import base64
 from huggingface_hub import login
-from dotenv import load_dotenv
 
 # Pre-load models globally
 bst = None
@@ -24,7 +23,7 @@ counter = 0
 
 def show_choice(choice):
     if choice == "Explain Factor":
-          counㅣter = 0
+          counter = 0
     elif choice == "Explain shortly":
           counter = 1
     elif choice == "Explain in detail":
@@ -36,17 +35,11 @@ def get_base64_image(image_path):
     return base64.b64encode(img_file.read()).decode('utf-8')
 
 
-def get_base64_image(image_path):
-  with open(image_path, "rb") as img_file:
-    return base64.b64encode(img_file.read()).decode('utf-8')
-
-
 def load_models():
   global bst, gemma_tokenizer, gemma_model
   
-  # token = input("Enter your Huggingface token for Gemma2 9b:")
-  load_dotenv()
-  login(os.getenv("HUGGINGFACE_TOKEN"))
+  token = input("Enter your Huggingface token for Gemma2 9b:")
+  login(token)
   
   # Load the XGBoost model
   bst = xgb.Booster()
@@ -156,7 +149,7 @@ def format_prompt1(predict_proba_good, predict_proba_bad, predicted_class, shap_
     lime_analysis=lime_analysis
   )
 
-def format_prompt2(predict_proba_good, predict_proba_bad, predicted_class, shap_analysis, lime_analysis):
+def format_prompt0(predict_proba_good, predict_proba_bad, predicted_class, shap_analysis, lime_analysis):
   prompt = inspect.cleandoc('''
     Question:
     The following is the result of binary classification using the HELOC (Home Equity Line of Credit) Dataset and XGBClassifier to classify RiskPerformance into “Good” and “Bad.”
@@ -171,15 +164,33 @@ def format_prompt2(predict_proba_good, predict_proba_bad, predicted_class, shap_
 
     Context:
     1. Prediction Probability
-    - Good: {predict_proba_good}
-    - Bad: {predic_proba_bad}
-    - Predicted to {predicted_class}
+    - Good: 0.57029474
+    - Bad: 0.4297053
+    - Predicted to Good
 
     2. SHAP analysis (Feature, SHAP Importance)
-    {shap_analysis}
+    - (NumSatisfactoryTrades, 0.320243)
+    - (PercentTradesNeverDelq, 0.305187)
+    - (MSinceMostRecentInqexcl7days, 0.293064)
+    - (NumTradesOpeninLast12M, 0.227222)
+    - (MaxDelq2PublicRecLast12M, 0.212770)
+    - (NumBank2NatlTradesWHighUtilization, 0.073882)
+    - (NumTotalTrades, 0.065301)
+    - (NumRevolvingTradesWBalance, 0.049232)
+    - (MSinceMostRecentDelq, 0.042432)
+    - (NumInqLast6M, 0.039852)
 
     3. LIME analysis (Feature, LIME Importance)
-    {lime_analysis}
+    - (MSinceMostRecentInqexcl7days <= -7.00, -0.186905)
+    - (6.00 < MaxDelq2PublicRecLast12M <= 7.00, -0.135623)
+    - (96.00 < PercentTradesNeverDelq <= 100.00, -0.124091)
+    - (NumSatisfactoryTrades > 27.00, -0.110831)
+    - (NumTradesOpeninLast12M > 3.00,  0.058771)
+    - (NumRevolvingTradesWBalance > 5.00, 0.036777)
+    - (NumTotalTrades > 29.00, -0.027887)
+    - (PercentInstallTrades <= 20.00, 0.027751)
+    - (NumTrades90Ever2DerogPubRec <= 0.00, -0.019881)
+    - (49.50 < PercentTradesWBalance <= 67.00, -0.013193)
 
     Answer:
     1. SHAP Analysis: First, explain each feature's SHAP importance and how it contributes to the final prediction.
