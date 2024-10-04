@@ -33,6 +33,10 @@ MMExplainer is an AI-driven solution designed to predict RiskPerformance on the 
    python demo.py
    ```
 
+## Tutorial & Introduce Video
+
+- https://youtu.be/lirsDQvL5BU
+
 ## Future Work
 
 - Integrate additional machine learning models.
